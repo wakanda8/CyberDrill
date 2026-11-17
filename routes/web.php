@@ -87,12 +87,12 @@ Route::get('/certificate', [ProfileController::class, 'showCertificate'])->name(
 | Admin Routes (Login + Admin Check Required)
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'admin'])->group(function () {
     // Basic Admin Dashboard
     Route::get('/admin', [AdminController::class, 'index'])->name('admin.dashboard');
     Route::get('/admin/export', [AdminController::class, 'export'])->name('admin.export');
     Route::delete('/admin/attempt/{id}', [AdminController::class, 'deleteAttempt'])->name('admin.deleteAttempt');
-    Route::resource('questions', AdminQuestionController::class);
+    Route::resource('questions', AdminQuestionController::class)->except('show');
     
 
     // Question Management (Phishing)
@@ -105,18 +105,6 @@ Route::middleware(['auth'])->group(function () {
             'update'  => 'admin.questions.update',
             'destroy' => 'admin.questions.destroy',
         ]
-    ]);
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| Utility / Maintenance Routes (Safe to delete before final submission)
-|--------------------------------------------------------------------------
-*/
-Route::get('/repair-all', function () {
-    // Clear and restore data logic moved to QuestionSeeder.php for safety
-    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--class' => 'QuestionSeeder']);
-    return "<h1>✅ Database Restored from Seeder!</h1><p><a href='/'>Back Home</a></p>";
+    ])->except('show');
 });
 

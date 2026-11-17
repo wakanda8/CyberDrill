@@ -5,29 +5,27 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\SimulationAttempt;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class AdminController extends Controller
 {
-    public function index()
+    /**
+     * Admin dashboard. Access is checked by the ['auth', 'admin'] route group in routes/web.php.
+     */
+    public function index(): View
     {
-        // 1. Security Check (Simple Version)
-        if (!Auth::check() || !Auth::user()->is_admin) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        // 2. Global Stats
+        // 1. Global Stats
         $totalUsers = User::count();
         $totalAttempts = SimulationAttempt::count();
         $avgScore = round(SimulationAttempt::avg('score') ?? 0);
-        
-        // 3. Recent Activity Feed (Who submitted what recently?)
+
+        // 2. Recent Activity Feed (Who submitted what recently?)
         $recentActivity = SimulationAttempt::with('user')
             ->latest()
             ->take(5)
             ->get();
 
-        // 4. User List (with attempt counts)
+        // 3. User List (with attempt counts)
         // We use 'withCount' to efficiently count simulation_attempts for each user
         $users = User::withCount('simulationAttempts as runs_count')
             ->orderBy('created_at', 'desc')
