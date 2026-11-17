@@ -10,9 +10,6 @@ class QuestionSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Nuke the old data to prevent duplicates
-        MalwareScenario::truncate();
-
         // --- MALWARE SCENARIOS (8 TOTAL: 4 MALICIOUS, 4 SAFE) ---
         $malware = [
             // 1. MALICIOUS: Ransomware
@@ -113,8 +110,10 @@ class QuestionSeeder extends Seeder
             ]
         ];
 
+        // Update the built-in scenarios in place (matched by filename) so re-seeding
+        // keeps scenario IDs stable and never deletes scenarios added by admins
         foreach ($malware as $m) {
-            \App\Models\MalwareScenario::create($m);
+            MalwareScenario::updateOrCreate(['filename' => $m['filename']], $m);
         }
     }
 }

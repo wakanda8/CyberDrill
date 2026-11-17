@@ -15,11 +15,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            PhishingScenarioSeeder::class,
+            QuestionSeeder::class,      // malware scenarios
+            SpamQuestionSeeder::class,
         ]);
+
+        // Ready-made admin for local development only (never in production)
+        if (app()->isLocal()) {
+            $admin = User::firstOrNew(['email' => 'test@example.com']);
+
+            // Only set the password on first creation, so re-seeding doesn't re-hash and rewrite it
+            if (! $admin->exists) {
+                $admin->password = 'password'; // hashed by the User model's cast
+            }
+
+            $admin->forceFill(['name' => 'Test User', 'is_admin' => true])->save();
+        }
     }
 }
