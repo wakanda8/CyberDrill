@@ -19,7 +19,7 @@
     <style>
         /* Base Styles */
         .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
-        .panel { background: var(--bg-card, #fff); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); margin-bottom: 20px; }
+        .panel { background: var(--bg-card, #fff); color: var(--text-main); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color, #e2e8f0); margin-bottom: 20px; }
         .scenario-btn { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid var(--border-color, #e2e8f0); cursor: pointer; transition: 0.2s; }
         .scenario-btn:hover { background: rgba(0,0,0,0.02); }
         .scenario-disabled { opacity: 0.6; pointer-events: none; background: rgba(0,0,0,0.05); }

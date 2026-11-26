@@ -14,7 +14,7 @@
         .stat-info p { margin: 0; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; }
 
         .layout-split { display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
-        .panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
+        .panel { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; }
         .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .panel-title { font-size: 1.2rem; font-weight: bold; }
 
