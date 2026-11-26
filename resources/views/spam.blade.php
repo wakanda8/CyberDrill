@@ -329,7 +329,7 @@
                     <div id="fb-icon" style="font-size: 5rem; margin-bottom: 10px;">✅</div>
                     <h2 id="fb-title" style="font-size: 2rem; margin-bottom: 15px;">THREAT NEUTRALIZED</h2>
                     <p id="fb-message" style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.6; max-width: 600px; margin: 0 auto 30px auto;"></p>
-                    <button class="btn-triage" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); max-width: 300px; margin: 0 auto;" onclick="loadNextEmail()">LOAD NEXT EMAIL ➔</button>
+                    <button class="btn-triage" style="background: var(--module-accent); color: #000; border: none; max-width: 300px; margin: 0 auto;" onclick="loadNextEmail()">LOAD NEXT EMAIL ➔</button>
                 </div>
                 
                 <div id="completion-screen" style="text-align: center; padding: 60px 20px;">
