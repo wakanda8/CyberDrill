@@ -64,7 +64,7 @@ class SimulationController extends Controller
         $scenarios = MalwareScenario::all();
 
         return view('malware', [
-            'scenarios' => $scenarios->makeHidden('options'),
+            'scenarios' => $scenarios->setVisible(MalwareScenario::PUBLIC_FIELDS),
             'choices' => $scenarios->mapWithKeys(fn (MalwareScenario $scenario) => [$scenario->id => $scenario->choiceTexts()]),
             'savedProgress' => $this->savedProgress('malware', $scenarios->modelKeys()),
             'attempts' => SimulationAttempt::where('user_id', Auth::id())
@@ -167,7 +167,8 @@ class SimulationController extends Controller
      * attempt and clear the answers. Answers to scenarios that don't exist are ignored,
      * so the score can never go above 100.
      *
-     * The answers being scored are claimed by deleting exactly those rows first. If a
+     * A submit with no answers is refused, so an empty attempt is never recorded. The
+     * answers being scored are claimed by deleting exactly those rows first. If a
      * parallel submit (double click, second tab) already claimed them, no second attempt
      * is recorded, and an answer saved after this point stays for the next attempt.
      *
@@ -178,6 +179,10 @@ class SimulationController extends Controller
         $answers = SimulationProgress::where('user_id', Auth::id())
             ->where('module', $module)
             ->get(['id', 'scenario_id', 'status']);
+
+        if ($answers->isEmpty()) {
+            return response()->json(['message' => 'Answer at least one scenario before submitting.'], 422);
+        }
 
         if (SimulationProgress::whereKey($answers->modelKeys())->delete() !== $answers->count()) {
             return response()->json(['message' => 'This attempt has already been submitted.'], 409);

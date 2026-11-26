@@ -12,7 +12,7 @@ class AuthRateLimitTest extends TestCase
 
     private const TOO_MANY = 'Too many attempts. Please wait a minute and try again.';
 
-    public function test_login_is_blocked_after_five_attempts_even_with_the_right_password(): void
+    public function test_login_is_blocked_after_five_failures_even_with_the_right_password(): void
     {
         $user = User::factory()->create(['email' => 'student@example.com']);
 
@@ -27,25 +27,55 @@ class AuthRateLimitTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_login_is_blocked_after_twenty_attempts_from_one_ip_across_accounts(): void
+    public function test_login_is_blocked_after_fifty_failures_from_one_ip_across_accounts(): void
     {
-        for ($attempt = 0; $attempt < 20; $attempt++) {
-            $this->post('/login', ['email' => "student{$attempt}@example.com", 'password' => 'Password123'])
-                ->assertSessionDoesntHaveErrors(['email' => self::TOO_MANY]);
-        }
+        $this->failLoginsAcrossAccounts(50);
 
         $this->post('/login', ['email' => 'student99@example.com', 'password' => 'Password123'])
             ->assertSessionHasErrors(['email' => self::TOO_MANY]);
     }
 
-    public function test_register_is_blocked_after_five_attempts(): void
+    public function test_successful_logins_from_one_network_are_never_counted(): void
     {
-        for ($attempt = 0; $attempt < 5; $attempt++) {
+        $user = User::factory()->create();
+
+        for ($attempt = 0; $attempt < 55; $attempt++) {
+            $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/');
+        }
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_visitors_behind_the_same_proxy_are_limited_separately(): void
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1']);
+
+        $this->withHeader('X-Forwarded-For', '203.0.113.10');
+        $this->failLoginsAcrossAccounts(50);
+        $this->post('/login', ['email' => 'student99@example.com', 'password' => 'Password123'])
+            ->assertSessionHasErrors(['email' => self::TOO_MANY]);
+
+        $this->withHeader('X-Forwarded-For', '198.51.100.20');
+        $this->post('/login', ['email' => 'student99@example.com', 'password' => 'Password123'])
+            ->assertSessionDoesntHaveErrors(['email' => self::TOO_MANY]);
+    }
+
+    public function test_register_is_blocked_after_thirty_attempts_from_one_ip(): void
+    {
+        for ($attempt = 0; $attempt < 30; $attempt++) {
             $this->post('/register', ['name' => 'Spammer', 'email' => 'not-an-email'])
                 ->assertSessionDoesntHaveErrors(['email' => self::TOO_MANY]);
         }
 
         $this->post('/register', ['name' => 'Spammer', 'email' => 'not-an-email'])
             ->assertSessionHasErrors(['email' => self::TOO_MANY]);
+    }
+
+    private function failLoginsAcrossAccounts(int $count): void
+    {
+        for ($attempt = 0; $attempt < $count; $attempt++) {
+            $this->post('/login', ['email' => "student{$attempt}@example.com", 'password' => 'Password123'])
+                ->assertSessionDoesntHaveErrors(['email' => self::TOO_MANY]);
+        }
     }
 }

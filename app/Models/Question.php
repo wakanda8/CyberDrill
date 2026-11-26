@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\DecodesOptions;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Question extends Model
 {
@@ -39,7 +40,7 @@ class Question extends Model
 
         $label = $decision === 'junk' ? 'Junk' : 'Inbox';
         $chosen = collect($this->decodedOptions())
-            ->first(fn (array $option): bool => str_contains((string) ($option['text'] ?? ''), $label));
+            ->first(fn (array $option): bool => Str::contains((string) ($option['text'] ?? ''), $label, ignoreCase: true));
 
         return [
             'status' => ($chosen['result'] ?? null) === 'correct' ? 'correct' : 'incorrect',

@@ -10,12 +10,14 @@ return new class extends Migration
     /**
      * One answer per user, module and scenario, so two answers sent at the same time
      * can't both be stored.
+     *
+     * simulation_progress only holds unsubmitted answers, and every answer saved before
+     * this release was graded by the browser, so none can be trusted. They are cleared
+     * first (which also removes any duplicates). Submitted scores in simulation_attempts
+     * are kept.
      */
     public function up(): void
     {
-        // simulation_progress only holds unsubmitted answers, and every answer saved before
-        // this release was graded by the browser, so none can be trusted. Clear them (this
-        // also removes any duplicates). Submitted scores in simulation_attempts are kept.
         DB::table('simulation_progress')->delete();
 
         Schema::table('simulation_progress', function (Blueprint $table) {

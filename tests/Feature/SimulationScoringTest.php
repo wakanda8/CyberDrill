@@ -79,6 +79,46 @@ class SimulationScoringTest extends TestCase
             ->assertJsonPath('zones.*.correct', [true, true, true]);
     }
 
+    public function test_sms_keyword_zones_map_to_the_two_sms_zones(): void
+    {
+        $sms = PhishingScenario::create([
+            'key' => fake()->unique()->slug(3),
+            'title' => 'Parcel Update',
+            'type' => 'sms',
+            'sender_name' => 'POS Laju',
+            'body' => 'Your parcel is held. Pay RM1 at http://pos-laju-pay.example',
+            'is_phishing' => true,
+            'malicious_zone' => 'link',
+        ]);
+
+        $this->postJson('/phishing/update', [
+            'scenario_id' => $sms->id,
+            'action' => 'report',
+            'flags' => ['zone1' => 'green', 'zone2' => 'red'],
+        ])->assertOk()
+            ->assertJsonPath('zones.*.should_be', ['green', 'red'])
+            ->assertJsonPath('zones.*.correct', [true, true]);
+    }
+
+    public function test_spam_options_are_matched_regardless_of_case(): void
+    {
+        $question = $this->spamQuestion(['options' => json_encode([
+            ['text' => 'flag as junk', 'result' => 'incorrect', 'feedback' => 'It was safe.'],
+            ['text' => 'Keep in inbox', 'result' => 'correct', 'feedback' => 'Right, it was safe.'],
+        ])]);
+
+        $this->postJson('/spam/update', ['question_id' => $question->id, 'decision' => 'inbox'])
+            ->assertOk()->assertJson(['status' => 'correct', 'feedback' => 'Right, it was safe.']);
+    }
+
+    public function test_submitting_with_no_answers_is_refused(): void
+    {
+        $this->malwareScenario();
+
+        $this->postJson('/malware/submit')->assertUnprocessable();
+        $this->assertDatabaseCount('simulation_attempts', 0);
+    }
+
     public function test_phishing_hint_is_generic_and_reveals_no_answer(): void
     {
         $scenario = $this->phishingScenario();

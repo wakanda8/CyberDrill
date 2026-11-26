@@ -524,10 +524,21 @@
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
             body: JSON.stringify({ question_id: email.id, decision: decision })
         })
-        .then(res => res.json().then(data => ({ ok: res.ok, data })))
-        .then(({ ok, data }) => {
+        .then(res => res.json().then(data => ({ ok: res.ok, code: res.status, data })))
+        .then(({ ok, code, data }) => {
             grading = false;
-            if (!ok && !data.status) {
+            if (code === 401 || code === 419) { // logged out or session expired: retrying can't work
+                alert('Your session has expired. The page will reload so you can carry on.');
+                window.location.reload();
+                return;
+            }
+            if (code === 422) { // this email no longer exists (e.g. an admin removed it)
+                pendingDecision = null;
+                alert('This email is no longer available and has been skipped.');
+                loadNextEmail();
+                return;
+            }
+            if (!ok && !data.status) { // server error: the next click retries the same decision
                 alert((data.message || 'Could not grade this email.') + ' Click Junk or Inbox to try again.');
                 return;
             }

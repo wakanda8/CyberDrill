@@ -92,23 +92,19 @@ class PhishingScenario extends Model
 
     /**
      * Zones that hold the threat, parsed from malicious_zone (e.g. "zone1, zone3" or "sender, link").
+     * Emails: zone1 subject, zone2 sender, zone3 body. SMS: zone1 sender header, zone2 body.
      *
      * @return list<string>
      */
     private function maliciousZones(): array
     {
         $raw = Str::lower((string) $this->malicious_zone);
-        $zones = [];
 
-        if (Str::contains($raw, ['subject', 'header', 'zone1'])) {
-            $zones[] = 'zone1';
-        }
-        if (Str::contains($raw, ['sender', 'email', 'zone2'])) {
-            $zones[] = 'zone2';
-        }
-        if (Str::contains($raw, ['body', 'link', 'content', 'zone3'])) {
-            $zones[] = 'zone3';
-        }
+        $keywords = $this->type === 'email'
+            ? ['zone1' => ['subject', 'header', 'zone1'], 'zone2' => ['sender', 'email', 'zone2'], 'zone3' => ['body', 'link', 'content', 'zone3']]
+            : ['zone1' => ['header', 'sender', 'zone1'], 'zone2' => ['body', 'link', 'content', 'zone2']];
+
+        $zones = array_keys(array_filter($keywords, fn (array $words): bool => Str::contains($raw, $words)));
 
         if ($this->is_phishing && $zones === []) {
             $zones[] = $this->type === 'email' ? 'zone3' : 'zone2';

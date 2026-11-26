@@ -33,7 +33,7 @@ Route::get('/', function () {
 
 // Auth: Login
 Route::get('/login', function () { return view('auth.login'); })->name('login');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login.submit');
+Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 
 // Auth: Register
 Route::get('/register', function () { return view('auth.register'); })->name('register');
