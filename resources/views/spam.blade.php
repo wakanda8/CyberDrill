@@ -21,6 +21,7 @@
             --safe-color: #22c55e;
             --danger-color: #ef4444;
             --danger-glow: rgba(239, 68, 68, 0.4);
+            --reader-bg: #1e1e2f; /* the email reader and stopwatch stay dark in both themes */
         }
 
         .dashboard-grid { 
@@ -32,6 +33,7 @@
 
         .panel { 
             background: var(--bg-card); 
+            color: var(--text-main);
             padding: 25px; 
             border-radius: 12px; 
             border: 1px solid var(--border-color); 
@@ -109,7 +111,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(0,0,0,0.4);
+            background: var(--reader-bg);
             box-shadow: 0 0 15px var(--module-accent-glow), inset 0 0 15px rgba(0,0,0,0.5);
             transition: all 0.3s ease;
         }
@@ -148,7 +150,8 @@
         /* --- ACTIVE EMAIL DISPLAY --- */
         .email-reader {
             flex-grow: 1; 
-            background: #1e1e2f; 
+            background: var(--reader-bg);
+            color: #f1f5f9;
             border-left: 4px solid var(--module-accent);
             border-radius: 8px; 
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -172,7 +175,7 @@
         .btn-inbox:hover { background: var(--safe-color); color: white; box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
 
         /* --- STATS SIDEBAR --- */
-        .stat-block { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .stat-block { background: var(--bg-body); padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .score-display { font-size: 3.5rem; font-weight: bold; text-align: center; margin: 20px 0; color: var(--module-accent); text-shadow: 0 0 15px var(--module-accent-glow); }
         
         #feedback-screen, #completion-screen, #active-email-container, #countdown-screen { display: none; }

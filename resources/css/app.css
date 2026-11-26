@@ -10,6 +10,8 @@
     --text-muted: #64748b;
     --border-color: #e2e8f0;
     --primary-color: #2563eb;
+    --on-primary: #ffffff; /* text on --primary-color buttons */
+    --admin-link-color: #b45309;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     
     /* Card Specific Borders (Light Mode - Subtle) */
@@ -27,6 +29,8 @@
     --text-muted: #94a3b8;
     --border-color: #334155;
     --primary-color: #38bdf8; /* Cyan for buttons */
+    --on-primary: #0f172a; /* white text is unreadable on the light cyan */
+    --admin-link-color: #f59e0b;
     --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 
     /* Neon Glow Colors */
@@ -89,7 +93,7 @@ ul { list-style: none; }
 
 /* --- BUTTONS --- */
 .btn { padding: 0.6rem 1.2rem; border-radius: 6px; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
-.btn-primary { background-color: var(--primary-color); color: #fff; }
+.btn-primary { background-color: var(--primary-color); color: var(--on-primary); }
 /* The page background is dark in both themes (see GLOBAL CYBERDRILL BACKGROUND), so outline
    buttons use light text. The navbar's button sits on the light bar and overrides this inline. */
 .btn-outline { border-color: rgba(255,255,255,0.4); color: #ffffff; background: transparent; }
@@ -530,8 +534,15 @@ footer { text-align: center; padding: 2rem; border-top: 1px solid var(--border-c
     font-weight: 600;
 }
 
+/* The home module cards and the module footer are dark in both themes, so the text
+   inside them keeps the dark theme's colours. */
+.card, .module-footer {
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+}
+
 .module-footer a {
-    color: var(--primary-color); /* Will use your global theme color */
+    color: #38bdf8; /* the footer is dark in both themes, so links use the dark theme's cyan */
     text-decoration: none;
     transition: opacity 0.2s;
 }

@@ -10,7 +10,7 @@
         .learn-container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
         .hero-section { text-align: center; margin-bottom: 40px; }
         .hero-icon { font-size: 4rem; margin-bottom: 10px; display: inline-block; animation: shake 2s ease-in-out infinite; }
-        .section-box { background: var(--bg-card); padding: 30px; border-radius: 12px; margin-bottom: 30px; border: 1px solid var(--border-color); }
+        .section-box { background: var(--bg-card); color: var(--text-main); padding: 30px; border-radius: 12px; margin-bottom: 30px; border: 1px solid var(--border-color); }
         .section-title { color: var(--primary-color); font-size: 1.5rem; margin-bottom: 15px; font-weight: bold; }
         .content-text { line-height: 1.8; color: var(--text-main); font-size: 1.05rem; }
         .tip-list { list-style: none; padding: 0; }

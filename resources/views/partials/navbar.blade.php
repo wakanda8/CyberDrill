@@ -11,7 +11,7 @@
         <div class="nav-auth">
             @auth
                 @if(Auth::user()->is_admin)
-                    <a href="{{ route('admin.dashboard') }}" class="nav-item" style="color: #f59e0b; margin-right: 20px; font-weight: bold;">
+                    <a href="{{ route('admin.dashboard') }}" class="nav-item" style="color: var(--admin-link-color); margin-right: 20px; font-weight: bold;">
                         ⚡ Admin Panel
                     </a>
                 @endif

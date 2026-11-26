@@ -25,6 +25,7 @@
         /* --- CARDS --- */
         .card-box {
             background: var(--bg-card);
+            color: var(--text-main);
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 2rem;
@@ -109,7 +110,7 @@
     $earnedCertificate = ($phishScore >= 80 && $malwScore >= 80 && $spamScore >= 80);
 @endphp
 
-<div class="panel" style="text-align: center; margin-top: 2rem;">
+<div class="card-box" style="text-align: center; margin-top: 2rem;">
     <h3 style="color: var(--primary-color);">🏆 Cyber Security Certification</h3>
     
     @if($earnedCertificate)
