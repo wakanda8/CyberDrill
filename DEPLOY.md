@@ -15,6 +15,7 @@ Cloudflare provides the HTTPS certificate. The app trusts the proxy in front of 
 - A machine that stays on, with Docker:
   - Windows: Docker Desktop.
   - Linux: Docker Engine with the Compose plugin.
+  - Docker Compose **2.23.1 or newer**, because the database password is passed as a Compose secret. Check with `docker compose version`.
 - The Cloudflare account that manages `hpcs.my`.
 - Outbound internet access. The tunnel uses port 7844 outbound.
 
@@ -40,7 +41,7 @@ cp .env.production.example .env.production
 
 Edit `.env.production` and fill in these values:
 
-- `DB_PASSWORD`: a long random password. On Linux, `openssl rand -hex 24` makes one.
+- `DB_PASSWORD`: a long random password. On Linux, `openssl rand -hex 24` makes one. It must not be empty. If the `db` container stops with `/run/secrets/db_password: No such file or directory`, either `DB_PASSWORD` is empty or Docker Compose is older than 2.23.1.
 - `CLOUDFLARE_TUNNEL_TOKEN`: the token from step 1.
 - `APP_KEY`: generate it after `DB_PASSWORD` is set, with:
 
@@ -84,6 +85,20 @@ docker compose --env-file .env.production up -d --build
 ```
 
 Migrations run automatically when the app starts. Run `db:seed --force` again only when the built-in scenarios change. It updates the built-in scenarios and keeps the ones admins added.
+
+## Changing the database password
+
+PostgreSQL keeps the password it was first created with, even if you later change `DB_PASSWORD`. Change it in the database first, then in the settings file:
+
+1. Open a database shell:
+
+   ```sh
+   docker compose --env-file .env.production exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   ```
+
+2. Type `\password`, enter the new password twice, then type `\q`.
+3. Put the same password in `DB_PASSWORD` in `.env.production`.
+4. Run `docker compose --env-file .env.production up -d`.
 
 ## Backups
 
