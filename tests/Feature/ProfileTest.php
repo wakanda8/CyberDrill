@@ -48,6 +48,18 @@ class ProfileTest extends TestCase
         $this->assertSame('KOE', $user->fresh()->kulliyyah);
     }
 
+    public function test_a_tampered_array_value_is_rejected_and_the_page_still_loads(): void
+    {
+        $this->actingAs(User::factory()->create(['kulliyyah' => 'KOE']));
+
+        $this->post(route('profile.update'), ['kulliyyah' => ['KICT']])
+            ->assertSessionHasErrors(['kulliyyah' => 'Please select a kulliyyah from the list.']);
+
+        $this->get(route('profile'))
+            ->assertOk()
+            ->assertSee('<option value="" disabled selected>', false);
+    }
+
     public function test_an_unlisted_kulliyyah_shows_the_placeholder_not_the_first_option(): void
     {
         $this->actingAs(User::factory()->create(['kulliyyah' => 'ISTAC']))

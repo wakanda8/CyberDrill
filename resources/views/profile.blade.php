@@ -152,7 +152,12 @@
                     <form action="{{ route('profile.update') }}" method="POST">
                         @csrf
                         <label>Select Your Kulliyyah (IIUM)</label>
-                        @php $selectedKulliyyah = old('kulliyyah', $user->kulliyyah); @endphp
+                        @php
+                            $selectedKulliyyah = old('kulliyyah', $user->kulliyyah);
+                            if (! is_string($selectedKulliyyah)) {
+                                $selectedKulliyyah = null; // e.g. a tampered array input flashed back after validation
+                            }
+                        @endphp
                         <select name="kulliyyah">
                             <option value="" disabled {{ ! array_key_exists((string) $selectedKulliyyah, \App\Models\User::KULLIYYAHS) ? 'selected' : '' }}>-- Select Kulliyyah --</option>
                             @foreach(\App\Models\User::KULLIYYAHS as $code => $name)
