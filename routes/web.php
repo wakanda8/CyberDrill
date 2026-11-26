@@ -33,11 +33,11 @@ Route::get('/', function () {
 
 // Auth: Login
 Route::get('/login', function () { return view('auth.login'); })->name('login');
-Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login.submit');
 
 // Auth: Register
 Route::get('/register', function () { return view('auth.register'); })->name('register');
-Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register')->name('register.submit');
 
 // News & Resources
 Route::get('/news', function () { return view('news'); })->name('news');
@@ -75,8 +75,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/spam', function () { return view('spam'); })->name('spam');
     // Inside your auth middleware group
 Route::get('/spam', [\App\Http\Controllers\SimulationController::class, 'showSpam'])->name('spam');
-Route::post('/spam/update', [\App\Http\Controllers\SimulationController::class, 'updateSpam']);
-Route::post('/spam/submit', [\App\Http\Controllers\SimulationController::class, 'submitSpam']);
+Route::post('/spam/update', [\App\Http\Controllers\SimulationController::class, 'updateSpam'])->name('spam.update');
+Route::post('/spam/submit', [\App\Http\Controllers\SimulationController::class, 'submitSpam'])->name('spam.submit');
 Route::get('/certificate', [ProfileController::class, 'showCertificate'])->name('certificate');
 
 });

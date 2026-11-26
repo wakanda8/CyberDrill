@@ -352,7 +352,7 @@
             Excellent work protecting the network.
         </p>
         <div style="font-size: 1.5rem; color: #a0aec0; margin-bottom: 40px;">
-            Final System Health: <strong id="final-score-display" style="font-size: 2.5rem; display: block; margin-top: 10px;">100%</strong>
+            Final Score: <strong id="final-score-display" style="font-size: 2.5rem; display: block; margin-top: 10px;">100%</strong>
         </div>
         <button class="btn-triage btn-inbox"style="all: unset;background: var(--safe-color); : white; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.9rem; height: 36px;  width: fit-content; 
                 display: inline-flex; align-items: center; justify-content: center;letter-spacing: 0.5px;box-shadow: 0 4px 6px rgba(0,0,0,0.2);"onclick="window.location.reload()">RETURN TO SIMULATION
@@ -378,6 +378,22 @@
         errors: 0,
         health: 100
     };
+
+    // Answers already recorded for this shift (e.g. after a reload). Resume after them,
+    // with the same health penalty handleResult applies for each wrong answer.
+    const answers = @json((object) ($savedProgress ?? []));
+    Object.values(answers).forEach(status => {
+        stats.processed++;
+        if (status === 'correct') { stats.correct++; } else { stats.errors++; }
+    });
+    stats.health = Math.max(0, 100 - 10 * stats.errors);
+    currentIndex = nextUnanswered(0);
+
+    function nextUnanswered(from) {
+        let index = from;
+        while (index < scenarios.length && answers[scenarios[index].id]) { index++; }
+        return index;
+    }
 
     const sfx = {
         openPage: new Audio('/sounds/open_page.mp3'),
@@ -406,7 +422,7 @@
         healthScore.innerText = stats.health + "%";
         document.getElementById('correct-count').innerText = stats.correct;
         document.getElementById('error-count').innerText = stats.errors;
-        document.getElementById('queue-count').innerText = `${currentIndex} / ${scenarios.length}`;
+        document.getElementById('queue-count').innerText = `${Object.keys(answers).length} / ${scenarios.length}`;
 
         // 2. Dynamic Sidebar Coloring (Green -> Yellow -> Red)
         if (stats.health >= 80) {
@@ -441,7 +457,7 @@
             else {
                 clearInterval(countdownInterval);
                 countdownScreen.style.display = 'none';
-                renderEmail(); 
+                showNextOrFinish();
             }
         }, 1000);
     }
@@ -483,20 +499,47 @@
         startTimer(); 
     }
 
+    let grading = false; // blocks double clicks while the server grades
+    let pendingDecision = null; // a decision the server hasn't confirmed yet; retried, never replaced
+
     function processEmail(decision) {
+        if (grading) return;
         clearInterval(timerInterval);
         sfx.timerTick.pause();
-        const email = scenarios[currentIndex];
-        const options = JSON.parse(email.options);
-        const correctOption = options.find(opt => opt.result === 'correct');
-        const isCorrect = (decision === 'junk' && correctOption.text.includes('Junk')) || 
-                          (decision === 'inbox' && correctOption.text.includes('Inbox'));
-        const feedbackObj = options.find(o => (decision === 'junk' ? o.text.includes('Junk') : o.text.includes('Inbox')));
-        handleResult(isCorrect, feedbackObj.feedback, email.id);
+        gradeEmail(pendingDecision || decision);
     }
 
     function processTimeout() {
-        handleResult(false, "TIME EXPIRED! Threat bypassed your filter.", scenarios[currentIndex].id);
+        gradeEmail('timeout');
+    }
+
+    // The server grades the decision ('junk', 'inbox' or 'timeout') and returns the feedback.
+    // If the request fails, the timer stays stopped and the next click retries the same decision.
+    function gradeEmail(decision) {
+        grading = true;
+        pendingDecision = decision;
+        const email = scenarios[currentIndex];
+        fetch(@json(route('spam.update')), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+            body: JSON.stringify({ question_id: email.id, decision: decision })
+        })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            grading = false;
+            if (!ok && !data.status) {
+                alert((data.message || 'Could not grade this email.') + ' Click Junk or Inbox to try again.');
+                return;
+            }
+            pendingDecision = null;
+            answers[email.id] = data.status;
+            handleResult(data.status === 'correct', ok ? data.feedback : data.message);
+        })
+        .catch(error => {
+            grading = false;
+            console.error('Grading error:', error);
+            alert('Could not reach the server. Click Junk or Inbox to try again.');
+        });
     }
 
     function triggerFlash(isCorrect) {
@@ -515,7 +558,7 @@
         }
     }
 
-    function handleResult(isCorrect, message, questionId) {
+    function handleResult(isCorrect, message) {
         stats.processed++;
         triggerFlash(isCorrect);
         
@@ -538,12 +581,6 @@
             showFeedback(false, message);
         }
         updateUI();
-
-        fetch('/spam/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-            body: JSON.stringify({ question_id: questionId, status: isCorrect ? 'correct' : 'incorrect' })
-        });
     }
 
     function showFeedback(isCorrect, message) {
@@ -557,8 +594,15 @@
     }
 
     function loadNextEmail() {
-        currentIndex++;
-        if (currentIndex < scenarios.length) {
+        currentIndex = nextUnanswered(currentIndex + 1);
+        showNextOrFinish();
+    }
+
+    // Show the next unanswered email, or the end of the shift
+    function showNextOrFinish() {
+        if (stats.health === 0) {
+            submitShift(true);
+        } else if (currentIndex < scenarios.length) {
             renderEmail();
         } else {
             document.getElementById('feedback-screen').style.display = 'none';
@@ -572,13 +616,17 @@
             if(!confirm("End shift anyway?")) return;
         }
 
-        fetch('/spam/submit', {
+        fetch(@json(route('spam.submit')), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
         })
         .then(res => res.json())
         .then(data => {
-            
+            if (data.score === undefined) {
+                alert(data.message || 'Could not submit this shift. Please try again.');
+                return;
+            }
+
             // Fix: Only play the success sound if they actually survived
             if (stats.health > 0) {
                 sfx.shiftEnd.currentTime = 0;
@@ -592,12 +640,13 @@
             const shiftEmoji = document.getElementById('shift-emoji');
             const shiftMessage = document.getElementById('shift-message');
             
-            scoreDisplay.innerText = stats.health + '%';
-            
+            // Show the server's score: it is the one recorded for the certificate
+            scoreDisplay.innerText = data.score + '%';
+
             let statusColor, statusGlow;
-            
-            // Dynamic messaging based on health
-            if (stats.health >= 80) {
+
+            // Messages follow the recorded score; running out of health still ends the shift as compromised
+            if (stats.health > 0 && data.score >= 80) {
                 statusColor = 'var(--safe-color)';
                 statusGlow = '0 0 20px rgba(34, 197, 94, 0.6)';
                 shiftTitle.innerText = "SHIFT COMPLETE";
@@ -608,7 +657,7 @@
                 statusGlow = '0 0 20px rgba(234, 179, 8, 0.6)'; 
                 shiftTitle.innerText = "SHIFT COMPLETE";
                 shiftEmoji.innerText = "⚠️";
-                shiftMessage.innerText = "Shift finished, but the network sustained damage. Be more careful next time.";
+                shiftMessage.innerText = "Shift finished, but you need 80% or more to pass. Be more careful next time.";
             } else {
                 statusColor = 'var(--danger-color)';
                 statusGlow = '0 0 20px rgba(239, 68, 68, 0.6)';
@@ -625,6 +674,10 @@
 
             document.getElementById('triage-workspace').style.display = 'none';
             document.getElementById('shift-complete-screen').style.display = 'flex';
+        })
+        .catch(error => {
+            console.error('Submission error:', error);
+            alert('Server error. Please try again.');
         });
     }
     
