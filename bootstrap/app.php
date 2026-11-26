@@ -22,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
             headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
         );
 
+        // First in the global stack, so early responses (maintenance 503, upload too large 413) get the headers too.
+        $middleware->prepend(\App\Http\Middleware\SecurityHeaders::class);
+
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
