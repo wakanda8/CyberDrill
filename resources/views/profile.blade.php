@@ -152,17 +152,16 @@
                     <form action="{{ route('profile.update') }}" method="POST">
                         @csrf
                         <label>Select Your Kulliyyah (IIUM)</label>
+                        @php $selectedKulliyyah = old('kulliyyah', $user->kulliyyah); @endphp
                         <select name="kulliyyah">
-                            <option value="" disabled {{ !$user->kulliyyah ? 'selected' : '' }}>-- Select Kulliyyah --</option>
-                            <option value="KICT" {{ $user->kulliyyah == 'KICT' ? 'selected' : '' }}>KICT - ICT</option>
-                            <option value="KOE" {{ $user->kulliyyah == 'KOE' ? 'selected' : '' }}>KOE - Engineering</option>
-                            <option value="KENMS" {{ $user->kulliyyah == 'KENMS' ? 'selected' : '' }}>KENMS - Economics</option>
-                            <option value="IRKHS" {{ $user->kulliyyah == 'IRKHS' ? 'selected' : '' }}>IRKHS - Human Sciences</option>
-                            <option value="AIKOL" {{ $user->kulliyyah == 'AIKOL' ? 'selected' : '' }}>AIKOL - Laws</option>
-                            <option value="KAED" {{ $user->kulliyyah == 'KAED' ? 'selected' : '' }}>KAED - Architecture</option>
-                            <option value="KOS" {{ $user->kulliyyah == 'KOS' ? 'selected' : '' }}>KOS - Science</option>
-                            <option value="KOM" {{ $user->kulliyyah == 'KOM' ? 'selected' : '' }}>KOM - Medicine</option>
+                            <option value="" disabled {{ ! array_key_exists((string) $selectedKulliyyah, \App\Models\User::KULLIYYAHS) ? 'selected' : '' }}>-- Select Kulliyyah --</option>
+                            @foreach(\App\Models\User::KULLIYYAHS as $code => $name)
+                                <option value="{{ $code }}" {{ $selectedKulliyyah === $code ? 'selected' : '' }}>{{ $code }} - {{ $name }}</option>
+                            @endforeach
                         </select>
+                        @error('kulliyyah')
+                            <p style="color: #ef4444; font-size: 0.9rem; margin: 8px 0;">{{ $message }}</p>
+                        @enderror
                         <button type="submit" class="btn btn-primary" style="width: 100%;">Save Changes</button>
                     </form>
                 </div>

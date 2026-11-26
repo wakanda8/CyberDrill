@@ -13,6 +13,20 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
+     * IIUM kulliyyahs a student can choose on the profile page (code => name).
+     */
+    public const KULLIYYAHS = [
+        'KICT' => 'ICT',
+        'KOE' => 'Engineering',
+        'KENMS' => 'Economics',
+        'IRKHS' => 'Human Sciences',
+        'AIKOL' => 'Laws',
+        'KAED' => 'Architecture',
+        'KOS' => 'Science',
+        'KOM' => 'Medicine',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
