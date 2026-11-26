@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,9 +12,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Render puts a proxy in front of the app. Trusting it makes $request->ip() the
-        // visitor's address (needed for per-visitor rate limits) instead of the proxy's.
-        $middleware->trustProxies(at: '*');
+        // A proxy sits in front of the app: the Cloudflare Tunnel in compose.yaml (or Render's
+        // proxy upstream). Trusting its X-Forwarded-For makes $request->ip() the visitor's address
+        // (needed for per-visitor rate limits), and X-Forwarded-Proto marks requests as HTTPS.
+        // Only those two headers are trusted: visitors can send their own X-Forwarded-Host, which
+        // the proxy passes on, and trusting it would let them change the app's generated URLs.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO,
+        );
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
