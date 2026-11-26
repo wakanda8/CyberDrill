@@ -12,6 +12,10 @@ RUN docker-php-ext-install pdo pdo_pgsql
 # 2. Enable Apache rewrite module (Needed for Laravel routes)
 RUN a2enmod rewrite
 
+# 2.5 Don't advertise the PHP or Apache version in response headers or error pages
+RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/zz-hardening.ini \
+    && sed -ri -e 's/^ServerTokens .*/ServerTokens Prod/' -e 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
+
 # 3. Change Apache's root directory to Laravel's /public folder
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
