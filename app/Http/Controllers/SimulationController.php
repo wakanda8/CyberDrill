@@ -2,199 +2,213 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\SimulationProgress;
-use App\Models\SimulationAttempt;
+use App\Models\MalwareScenario;
+use App\Models\PhishingScenario;
 use App\Models\Question;
-use App\Models\PhishingScenario; // <-- 1. Add your new model here
+use App\Models\SimulationAttempt;
+use App\Models\SimulationProgress;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
+/**
+ * The three simulations. The browser only ever sends what the user chose; the server
+ * grades it, records the first answer per scenario, and never sends answers ahead of time.
+ */
 class SimulationController extends Controller
 {
     // --- PHISHING MODULE METHODS --- //
 
-    public function index()
+    public function index(): View
     {
-        $user = Auth::user();
-        
-        // 2. Fetch directly from the new PhishingScenario model and key it by 'key'
-        // This completely replaces that big foreach loop you had before!
-        $scenarios = PhishingScenario::all()->keyBy('key');
-        
-        $progress = [];
-        $attempts = [];
-
-        if ($user) {
-            $progress = SimulationProgress::where('user_id', $user->id)
-                ->where('module', 'phishing')
-                ->pluck('status', 'scenario_id')
-                ->toArray();
-
-            $attempts = SimulationAttempt::where('user_id', $user->id)
-                ->where('module', 'phishing')
-                ->latest()
-                ->get();
-        }
+        $scenarios = PhishingScenario::all(PhishingScenario::PUBLIC_FIELDS)->keyBy('id');
 
         return view('phishing', [
             'scenarios' => $scenarios,
-            'savedProgress' => $progress,
-            'attempts' => $attempts
+            'savedProgress' => $this->savedProgress('phishing', $scenarios->keys()),
+            'attempts' => SimulationAttempt::where('user_id', Auth::id())
+                ->where('module', 'phishing')
+                ->latest()
+                ->get(),
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request): JsonResponse
     {
-        if (!Auth::check()) return response()->json(['error' => 'Unauthorized'], 401);
-        
-        $request->validate([
-            'scenario_id' => 'required|string', 
-            'status' => 'required'
+        $data = $request->validate([
+            'scenario_id' => ['required', 'integer', 'exists:phishing_scenarios,id'],
+            'action' => ['required', Rule::in(['report', 'reply', 'forward', 'link', 'back'])],
+            'flags' => ['nullable', 'array'],
+            'flags.*' => ['nullable', Rule::in(['red', 'green'])],
         ]);
-        
-        SimulationProgress::updateOrCreate(
-            ['user_id' => Auth::id(), 'module' => 'phishing', 'scenario_id' => $request->scenario_id],
-            ['status' => $request->status]
-        );
-        
-        return response()->json(['success' => true]);
+
+        $scenario = PhishingScenario::findOrFail($data['scenario_id']);
+        $grade = $scenario->grade($data['action'], $data['flags'] ?? []);
+
+        return $this->recordFirstAnswer('phishing', $scenario->id, $grade);
     }
 
-    public function submitAttempt()
+    public function submitAttempt(): JsonResponse
     {
-        $user = Auth::user();
-        $records = SimulationProgress::where('user_id', $user->id)->where('module', 'phishing')->get();
-        
-        // 3. Count using the new model instead of the old Question model
-        $totalQuestions = PhishingScenario::count();
-        if ($totalQuestions == 0) $totalQuestions = 4; // We have 4 seeded right now
-
-        $correct = $records->where('status', 'correct')->count();
-        $score = ($totalQuestions > 0) ? round(($correct / $totalQuestions) * 100) : 0;
-
-        SimulationAttempt::create(['user_id' => $user->id, 'module' => 'phishing', 'score' => $score]);
-        SimulationProgress::where('user_id', $user->id)->where('module', 'phishing')->delete();
-
-        return response()->json(['success' => true, 'score' => $score]);
+        return $this->submitModule('phishing', PhishingScenario::pluck('id'));
     }
 
+    // --- MALWARE MODULE METHODS --- //
 
-    // --- MALWARE MODULE METHODS (Untouched) --- //
-    
-    public function showMalware()
+    public function showMalware(): View
     {
-        $scenarios = \App\Models\MalwareScenario::all();
-
-        $attempts = \App\Models\SimulationAttempt::where('user_id', \Illuminate\Support\Facades\Auth::id())
-                    ->where('module', 'malware')
-                    ->latest()
-                    ->take(5)
-                    ->get();
-
-        $progress = \App\Models\SimulationProgress::where('user_id', \Illuminate\Support\Facades\Auth::id())
-            ->where('module', 'malware')
-            ->pluck('status', 'scenario_id')
-            ->toArray();
+        $scenarios = MalwareScenario::all();
 
         return view('malware', [
-            'scenarios' => $scenarios,
-            'savedProgress' => $progress,
-            'attempts' => $attempts 
+            'scenarios' => $scenarios->setVisible(MalwareScenario::PUBLIC_FIELDS),
+            'choices' => $scenarios->mapWithKeys(fn (MalwareScenario $scenario) => [$scenario->id => $scenario->choiceTexts()]),
+            'savedProgress' => $this->savedProgress('malware', $scenarios->modelKeys()),
+            'attempts' => SimulationAttempt::where('user_id', Auth::id())
+                ->where('module', 'malware')
+                ->latest()
+                ->take(5)
+                ->get(),
         ]);
     }
 
-    public function submitMalwareAttempt(Request $request)
+    public function updateMalware(Request $request): JsonResponse
     {
-        $userId = \Illuminate\Support\Facades\Auth::id();
-        
-        $totalScenarios = \App\Models\MalwareScenario::count();
-        $correctAnswers = \App\Models\SimulationProgress::where('user_id', $userId)
-                            ->where('module', 'malware')
-                            ->where('status', 'correct')
-                            ->count();
-        
-        $score = ($totalScenarios > 0) ? round(($correctAnswers / $totalScenarios) * 100) : 0;
-
-        \App\Models\SimulationAttempt::create([
-            'user_id' => $userId,
-            'module' => 'malware',
-            'score' => $score,
+        $data = $request->validate([
+            'question_id' => ['required', 'integer', 'exists:malware_scenarios,id'],
+            'choice' => ['required', 'integer', 'min:0'],
         ]);
 
-        \App\Models\SimulationProgress::where('user_id', $userId)
-            ->where('module', 'malware')
-            ->delete();
+        $scenario = MalwareScenario::findOrFail($data['question_id']);
+        $grade = $scenario->grade($data['choice']);
+
+        if ($grade === null) {
+            throw ValidationException::withMessages(['choice' => 'That option does not exist.']);
+        }
+
+        return $this->recordFirstAnswer('malware', $scenario->id, $grade);
+    }
+
+    public function submitMalwareAttempt(): JsonResponse
+    {
+        return $this->submitModule('malware', MalwareScenario::pluck('id'));
+    }
+
+    // --- SPAM MODULE METHODS --- //
+
+    public function showSpam(): View
+    {
+        $scenarios = Question::where('module', 'spam')->get(Question::PUBLIC_SPAM_FIELDS);
+
+        return view('spam', [
+            'scenarios' => $scenarios,
+            'savedProgress' => $this->savedProgress('spam', $scenarios->modelKeys()),
+            'attempts' => SimulationAttempt::where('user_id', Auth::id())
+                ->where('module', 'spam')
+                ->latest()
+                ->take(5)
+                ->get(),
+        ]);
+    }
+
+    public function updateSpam(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'question_id' => ['required', 'integer', Rule::exists('questions', 'id')->where('module', 'spam')],
+            'decision' => ['required', Rule::in(['junk', 'inbox', 'timeout'])],
+        ]);
+
+        $question = Question::findOrFail($data['question_id']);
+
+        return $this->recordFirstAnswer('spam', $question->id, $question->gradeSpamDecision($data['decision']));
+    }
+
+    public function submitSpam(): JsonResponse
+    {
+        return $this->submitModule('spam', Question::where('module', 'spam')->pluck('id'));
+    }
+
+    // --- SHARED HELPERS --- //
+
+    /**
+     * Store the user's first answer to a scenario. Later answers to the same scenario
+     * are rejected, so a wrong answer can't be retried until it comes out correct.
+     * The unique index on simulation_progress also stops two simultaneous answers.
+     *
+     * @param  array{status: string}  $grade
+     */
+    private function recordFirstAnswer(string $module, int $scenarioId, array $grade): JsonResponse
+    {
+        $progress = SimulationProgress::createOrFirst(
+            ['user_id' => Auth::id(), 'module' => $module, 'scenario_id' => (string) $scenarioId],
+            ['status' => $grade['status']],
+        );
+
+        if (! $progress->wasRecentlyCreated) {
+            return $this->alreadyAnswered($progress->status);
+        }
+
+        return response()->json($grade);
+    }
+
+    private function alreadyAnswered(string $status): JsonResponse
+    {
+        return response()->json([
+            'message' => 'You have already answered this scenario.',
+            'status' => $status,
+        ], 409);
+    }
+
+    /**
+     * Score the module as the percentage of its scenarios answered correctly, record the
+     * attempt and clear the answers. Answers to scenarios that don't exist are ignored,
+     * so the score can never go above 100.
+     *
+     * A submit with no answers is refused, so an empty attempt is never recorded. The
+     * answers being scored are claimed by deleting exactly those rows first. If a
+     * parallel submit (double click, second tab) already claimed them, no second attempt
+     * is recorded, and an answer saved after this point stays for the next attempt.
+     *
+     * @param  Collection<int, int>  $scenarioIds
+     */
+    private function submitModule(string $module, Collection $scenarioIds): JsonResponse
+    {
+        $answers = SimulationProgress::where('user_id', Auth::id())
+            ->where('module', $module)
+            ->get(['id', 'scenario_id', 'status']);
+
+        if ($answers->isEmpty()) {
+            return response()->json(['message' => 'Answer at least one scenario before submitting.'], 422);
+        }
+
+        if (SimulationProgress::whereKey($answers->modelKeys())->delete() !== $answers->count()) {
+            return response()->json(['message' => 'This attempt has already been submitted.'], 409);
+        }
+
+        $statuses = $answers->pluck('status', 'scenario_id');
+        $correct = $scenarioIds->filter(fn (int $id): bool => $statuses->get($id) === 'correct')->count();
+        $score = $scenarioIds->isEmpty() ? 0 : (int) round($correct / $scenarioIds->count() * 100);
+
+        SimulationAttempt::create(['user_id' => Auth::id(), 'module' => $module, 'score' => $score]);
 
         return response()->json(['success' => true, 'score' => $score]);
     }
 
-    public function updateMalware(Request $request)
+    /**
+     * Saved answers for the current user, limited to scenarios that still exist.
+     *
+     * @param  iterable<int|string>  $scenarioIds
+     * @return array<string, string>
+     */
+    private function savedProgress(string $module, iterable $scenarioIds): array
     {
-        if (!\Illuminate\Support\Facades\Auth::check()) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
-        \App\Models\SimulationProgress::updateOrCreate(
-            [
-                'user_id' => \Illuminate\Support\Facades\Auth::id(),
-                'module' => 'malware', 
-                'scenario_id' => $request->question_id, 
-            ],
-            [
-                'status' => $request->status,
-            ]
-        );
-
-        return response()->json(['success' => true]);
+        return SimulationProgress::where('user_id', Auth::id())
+            ->where('module', $module)
+            ->whereIn('scenario_id', collect($scenarioIds)->map(fn ($id): string => (string) $id))
+            ->pluck('status', 'scenario_id')
+            ->all();
     }
-
-
-    // --- SPAM MODULE METHODS (Untouched) --- //
-
-    public function showSpam()
-    {
-        $scenarios = \App\Models\Question::where('module', 'spam')->get();
-        $savedProgress = session()->get('spam_progress', []);
-        $attempts = \App\Models\SimulationAttempt::where('user_id', auth()->id())
-                        ->where('module', 'spam')
-                        ->orderBy('created_at', 'desc')
-                        ->take(5)
-                        ->get();
-
-        return view('spam', compact('scenarios', 'savedProgress', 'attempts'));
-    }
-
-    public function updateSpam(Request $request)
-    {
-        $progress = session()->get('spam_progress', []);
-        $progress[$request->question_id] = $request->status;
-        session()->put('spam_progress', $progress);
-
-        return response()->json(['success' => true]);
-    }
-
-    public function submitSpam(Request $request)
-    {
-        $scenarios = \App\Models\Question::where('module', 'spam')->get();
-        $progress = session()->get('spam_progress', []);
-        
-        $correct = 0;
-        foreach ($progress as $id => $status) {
-            if ($status === 'correct') $correct++;
-        }
-
-        $score = count($scenarios) > 0 ? round(($correct / count($scenarios)) * 100) : 0;
-
-        \App\Models\SimulationAttempt::create([
-            'user_id' => auth()->id(),
-            'module' => 'spam',
-            'score' => $score
-        ]);
-
-        session()->forget('spam_progress');
-
-        return response()->json(['score' => $score]);
-    }
-
-    
 }

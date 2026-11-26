@@ -338,7 +338,7 @@
 
                 <div style="margin-top: auto;">
                     <div id="hint-box" style="display:none; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; font-size: 0.85rem; color: #92400e; margin-bottom: 15px; line-height: 1.4;">
-                        <strong>Analysis Hint:</strong> ${data.feedback || 'Review the highlighted zones.'}
+                        <strong>Analysis Hint:</strong> Check each zone. Is the sender's name and domain exactly what you would expect? Does the message push urgency, fear or a reward? Do links or attachments lead somewhere other than they claim? Would this sender normally ask you for this?
                     </div>
                     <button id="hint-btn" class="btn-modern btn-ghost" style="width: 100%; margin-bottom: 15px; justify-content: center; background: #fffbeb; color: #d97706; border-color: #fde68a;" onclick="document.getElementById('hint-box').style.display='block'; this.style.display='none';">
                         <span class="material-symbols-outlined">lightbulb</span> Need a Hint?
@@ -480,85 +480,70 @@
             processAction(actionType);
         }
 
-        function processAction(actionType) {
-            const scenario = scenarios[currentScenarioId];
-            const isPhishing = scenario.is_phishing === true || scenario.is_phishing === '1' || scenario.is_phishing === 1; 
-            
-            let targetZones = [];
-            let rawZone = String(scenario.malicious_zone || '').toLowerCase();
-            
-            // --- UPDATED MULTI-ZONE SUPPORT ---
-            // If rawZone contains multiple keywords (e.g. "sender, link"), both will be pushed to the array.
-            if (rawZone.includes('subject') || rawZone.includes('header') || rawZone.includes('zone1')) targetZones.push('zone1');
-            if (rawZone.includes('sender') || rawZone.includes('email') || rawZone.includes('zone2')) targetZones.push('zone2');
-            if (rawZone.includes('body') || rawZone.includes('link') || rawZone.includes('content') || rawZone.includes('zone3')) targetZones.push('zone3');
-            
-            // Fallback if phishing is true but no zone specified
-            if (isPhishing && targetZones.length === 0) {
-                targetZones.push(scenario.type === 'email' ? 'zone3' : 'zone2');
-            }
+        let gradingInProgress = false; // blocks double clicks while the server grades
 
-            let correctFlags = 0;
+        // The server grades the action and flags, records the answer and returns the breakdown
+        function processAction(actionType) {
+            if (gradingInProgress) return;
+            gradingInProgress = true;
+
+            const warningOl = document.getElementById('warning-overlay');
+            if (warningOl) warningOl.style.display = 'none';
+
+            fetch(@json(route('phishing.update')), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                body: JSON.stringify({ scenario_id: currentScenarioId, action: actionType, flags: activeFlags })
+            })
+            .then(res => res.json().then(data => ({ ok: res.ok, data })))
+            .then(({ ok, data }) => {
+                gradingInProgress = false;
+                if (!ok) {
+                    alert(data.message || 'Could not grade this answer. Please try again.');
+                    if (data.status) finishScenario(data.status);
+                    return;
+                }
+                showGrade(data);
+            })
+            .catch(error => {
+                gradingInProgress = false;
+                console.error('Grading error:', error);
+                alert('Server error. Please try again.');
+            });
+        }
+
+        function showGrade(grade) {
+            const result = grade.status;
             let zoneFeedbackHTML = '';
 
-            for (let i = 1; i <= requiredZones; i++) {
-                const z = 'zone' + i;
-                const isZoneMalicious = targetZones.includes(z);
-                
-                let isCorrect = false;
-                if (isZoneMalicious) { 
-                    if (activeFlags[z] === 'red') { correctFlags++; isCorrect = true; }
-                } else { 
-                    if (activeFlags[z] === 'green') { correctFlags++; isCorrect = true; }
-                }
-
-                const zoneName = i === 1 ? (scenario.type === 'email' ? 'Subject / Header' : 'Message Header') : (i === 2 ? (scenario.type === 'email' ? 'Sender Identity' : 'Message Body') : 'Message Body / Links');
-                
-                // --- NEW DYNAMIC EXPLANATION LOGIC ---
-                let zoneExplanation = "";
-                let customFeedback = scenario['feedback_' + z] || null; 
-                
-                if (customFeedback) {
-                    zoneExplanation = customFeedback;
-                } else {
-                    if (isZoneMalicious) {
-                        if (i === 1) zoneExplanation = "This section uses urgent, alarming, or irregular language typical of social engineering.";
-                        if (i === 2) zoneExplanation = "The sender details are forged, misspelled, or originate from an untrusted external domain.";
-                        if (i === 3) zoneExplanation = "The content contains suspicious links, unexpected attachments, or requests for sensitive data.";
-                    } else {
-                        if (i === 1) zoneExplanation = "The context and language used here match normal, expected communication patterns.";
-                        if (i === 2) zoneExplanation = "The sender's address and domain match the verified organization's official records.";
-                        if (i === 3) zoneExplanation = "The message body is standard and links/destinations safely match their display text.";
-                    }
-                }
+            grade.zones.forEach((zone, index) => {
+                const isCorrect = zone.correct;
 
                 zoneFeedbackHTML += `
                     <div style="margin-bottom: 12px; padding: 12px; background: ${isCorrect ? '#f0fdf4' : '#fef2f2'}; border-radius: 8px; border: 1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}; display: flex; align-items: flex-start; gap: 10px;">
                         <span class="material-symbols-outlined" style="color: ${isCorrect ? '#16a34a' : '#dc2626'}; font-size: 1.5rem; margin-top: 2px;">${isCorrect ? 'check_circle' : 'cancel'}</span>
                         <div style="display: flex; flex-direction: column; width: 100%;">
-                            <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${zoneName}</div>
+                            <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">${zone.name}</div>
                             <div style="color: #475569; font-size: 0.85rem; margin-top: 4px;">
-                                You marked: <strong style="color: ${activeFlags[z] === 'red' ? '#dc2626' : '#16a34a'}">${activeFlags[z] === 'red' ? 'Suspicious' : 'Safe'}</strong> 
-                                <span style="opacity: 0.7;">(Should be ${isZoneMalicious ? 'Suspicious' : 'Safe'})</span>
+                                You marked: <strong style="color: ${zone.marked === 'red' ? '#dc2626' : '#16a34a'}">${zone.marked === 'red' ? 'Suspicious' : 'Safe'}</strong>
+                                <span style="opacity: 0.7;">(Should be ${zone.should_be === 'red' ? 'Suspicious' : 'Safe'})</span>
                             </div>
                             <div style="color: ${isCorrect ? '#166534' : '#991b1b'}; font-size: 0.85rem; margin-top: 8px; padding-top: 8px; border-top: 1px dashed ${isCorrect ? '#bbf7d0' : '#fecaca'}; line-height: 1.4;">
-                                <strong>Analysis:</strong> ${zoneExplanation}
+                                <strong>Analysis:</strong> ${zone.explanation}
                             </div>
                         </div>
                     </div>
                 `;
 
                 // Highlight the actual drop zones in the inbox visually
-                const zoneEl = document.getElementById('zone-' + i);
+                const zoneEl = document.getElementById('zone-' + (index + 1));
                 if (zoneEl) {
                     zoneEl.style.border = isCorrect ? '2px solid #16a34a' : '2px solid #dc2626';
                     zoneEl.style.backgroundColor = isCorrect ? 'rgba(22, 163, 74, 0.05)' : 'rgba(220, 38, 38, 0.05)';
                     zoneEl.style.borderRadius = '8px';
                 }
-            }
+            });
 
-            let result = (actionType === 'report' && isPhishing) || (actionType !== 'report' && !isPhishing) ? 'correct' : 'incorrect';
-            
             if (result === 'correct') {
                 sfxCorrect.currentTime = 0; sfxCorrect.play().catch(e => console.log("Audio block:", e));
             } else {
@@ -566,18 +551,15 @@
             }
 
             const auditPanel = document.querySelector('.audit-panel') || document.querySelector('.audit-panel-phone');
-            
-            if (auditPanel) {
-                const warningOl = document.getElementById('warning-overlay');
-                if (warningOl) warningOl.style.display = 'none';
 
+            if (auditPanel) {
                 auditPanel.innerHTML = `
                     <div style="text-align: center; margin-bottom: 20px;">
                         <span class="material-symbols-outlined" style="color: ${result === 'correct' ? '#16a34a' : '#dc2626'}; font-size: 4rem;">${result === 'correct' ? 'gpp_good' : 'warning'}</span>
                         <h2 style="color: ${result === 'correct' ? '#16a34a' : '#dc2626'}; font-size: 1.4rem; margin: 5px 0 15px;">${result === 'correct' ? 'Correct Action' : 'Action Failed'}</h2>
-                        <div style="display: inline-block; background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; color: #0f172a;">Flags Accurate: ${correctFlags} / ${requiredZones}</div>
+                        <div style="display: inline-block; background: #e2e8f0; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; color: #0f172a;">Flags Accurate: ${grade.zones.filter(zone => zone.correct).length} / ${grade.zones.length}</div>
                     </div>
-                    
+
                     <div style="margin-bottom: 20px;">
                         <h4 style="font-size: 0.85rem; color: #64748b; text-transform: uppercase; margin-bottom: 10px;">Flag Breakdown</h4>
                         ${zoneFeedbackHTML}
@@ -585,22 +567,17 @@
 
                     <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; font-size: 0.9rem; color: #334155; margin-bottom: 20px; line-height: 1.5;">
                         <strong style="color: #0f172a;">Overall Scenario Feedback:</strong><br/>
-                        ${scenario.feedback || 'Review the detailed analysis tags above for more insight on this communication.'}
+                        ${grade.feedback}
                     </div>
-                    
-                    <button onclick="closeSimulationAndSave('${result}')" class="btn-modern" style="width: 100%; justify-content: center; background: ${result === 'correct' ? '#16a34a' : '#dc2626'}; color: white; padding: 12px; font-size: 1rem;">Save & Return</button>
+
+                    <button onclick="finishScenario('${result}')" class="btn-modern" style="width: 100%; justify-content: center; background: ${result === 'correct' ? '#16a34a' : '#dc2626'}; color: white; padding: 12px; font-size: 1rem;">Save & Return</button>
                 `;
             }
         }
 
-        function closeSimulationAndSave(status) {
+        // The answer is already saved on the server; just update the list
+        function finishScenario(status) {
             userProgress[currentScenarioId] = status;
-            fetch('/phishing/update', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, 
-                body: JSON.stringify({ scenario_id: currentScenarioId, status: status }) 
-            }).catch(error => console.error("Database Save Error:", error));
-
             document.getElementById('simulation-modal').style.display = 'none';
             renderList();
         }
@@ -627,7 +604,7 @@
                 if (!proceed) return;
             }
 
-            fetch('/phishing/submit', {
+            fetch(@json(route('phishing.submit')), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
             })
@@ -655,7 +632,7 @@
                     
                     modal.style.display = 'flex';
                 } else {
-                    alert("Error processing the score.");
+                    alert(data.message || "Error processing the score.");
                 }
             })
             .catch(err => {

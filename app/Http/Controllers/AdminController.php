@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\SimulationAttempt;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminController extends Controller
 {
@@ -36,8 +37,11 @@ class AdminController extends Controller
 
     // ... inside AdminController class ...
 
-    // 1. GENERATE REPORT (CSV Export)
-    public function export()
+    /**
+     * Generate the CSV report of all attempts. Students choose their own name, so any cell
+     * a spreadsheet would run as a formula (starting with = + - @, tab or CR) gets a ' prefix.
+     */
+    public function export(): StreamedResponse
     {
         $filename = "cyberdrill-report-" . date('Y-m-d') . ".csv";
 
@@ -51,7 +55,9 @@ class AdminController extends Controller
 
         $columns = ['Date', 'User Name', 'Email', 'Kulliyyah', 'Module', 'Score', 'Result'];
 
-        $callback = function() use ($columns) {
+        $cell = fn (?string $value): ?string => $value !== null && preg_match('/^[=+\-@\t\r]/', $value) ? "'".$value : $value;
+
+        $callback = function() use ($columns, $cell) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
@@ -63,9 +69,9 @@ class AdminController extends Controller
 
                 fputcsv($file, [
                     $attempt->created_at->format('Y-m-d H:i:s'),
-                    $attempt->user->name,
-                    $attempt->user->email,
-                    $attempt->user->kulliyyah ?? 'N/A',
+                    $cell($attempt->user->name),
+                    $cell($attempt->user->email),
+                    $cell($attempt->user->kulliyyah) ?? 'N/A',
                     ucfirst($attempt->module),
                     $attempt->score . '%',
                     $result
