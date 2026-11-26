@@ -16,6 +16,13 @@ RUN a2enmod rewrite
 RUN echo "expose_php = Off" > /usr/local/etc/php/conf.d/zz-hardening.ini \
     && sed -ri -e 's/^ServerTokens .*/ServerTokens Prod/' -e 's/^ServerSignature .*/ServerSignature Off/' /etc/apache2/conf-available/security.conf
 
+# 2.6 Cap Apache at 20 worker processes so a traffic spike can't use up a 1 GB server. Measured on
+# a t3.micro: workers show about 35 MB each but share most of it (about 8 MB unique each), and 36
+# busy workers used only about 75 MB more RAM. Extra requests queue for a free worker instead of
+# failing. The grep fails the build if a future base image changes the file and the cap is missed.
+RUN sed -ri 's/^(\s*MaxRequestWorkers\s+)[0-9]+/\120/' /etc/apache2/mods-available/mpm_prefork.conf \
+    && grep -Eq '^\s*MaxRequestWorkers\s+20$' /etc/apache2/mods-available/mpm_prefork.conf
+
 # 3. Change Apache's root directory to Laravel's /public folder
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
