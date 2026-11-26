@@ -26,7 +26,7 @@
           "for i in $(seq 1 40); do docker compose --env-file .env.production exec -T app curl -s -o /dev/null -w '%{http_code}' http://localhost/up 2>/dev/null | grep -q 200 && break; sleep 3; done",
           "code=$(docker compose --env-file .env.production exec -T app curl -s -o /dev/null -w '%{http_code}' http://localhost/up 2>/dev/null || true)",
           "echo \"deployed in $(( $(date +%s) - start ))s, app /up: ${code:-no response}\"",
-          "docker compose --env-file .env.production logs --since 5m app 2>&1 | grep -E 'Nothing to migrate|Running migrations|SQLSTATE|FAIL' | head -5 || true",
+          "if docker compose --env-file .env.production logs --since 5m app 2>&1 | grep -qE 'SQLSTATE|FAIL'; then echo 'migrations: errors - see docker compose logs app on the server (not printed here: Actions logs are public)'; else echo 'migrations: ok'; fi",
           "docker image prune -f > /dev/null",
           "test \"$code\" = 200"
         ]
