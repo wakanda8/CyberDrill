@@ -86,6 +86,25 @@ docker compose --env-file .env.production up -d --build
 
 Migrations run automatically when the app starts. Run `db:seed --force` again only when the built-in scenarios change. It updates the built-in scenarios and keeps the ones admins added.
 
+## Automatic deploys (GitHub Actions on AWS)
+
+`.github/workflows/deploy.yml` runs the tests on every pull request and on every push to `main`. When a push to `main` passes, it deploys:
+
+1. GitHub signs in to AWS through OIDC as the role in the `AWS_DEPLOY_ROLE_ARN` repository secret. No AWS keys are stored in GitHub, and the role only trusts this repo's `main` branch.
+2. It runs the `CyberDrill-Deploy` Systems Manager document on the server in the `CYBERDRILL_INSTANCE_ID` secret, passing the commit that was tested. The document moves the checkout to exactly that commit, rebuilds and restarts like "Updating to a new version", then checks `/up`. It expects the checkout at `/opt/cyberdrill`, owned by root, because Systems Manager runs it as root.
+
+A copy of the document is kept in `.github/ssm/CyberDrill-Deploy.json`. After changing it, update AWS so the copy and the live document stay the same:
+
+```sh
+aws ssm update-document --name CyberDrill-Deploy --document-version '$LATEST' --content file://.github/ssm/CyberDrill-Deploy.json
+aws ssm update-document-default-version --name CyberDrill-Deploy --document-version <new version number>
+```
+
+The role may run only that document, on only that server. If the tests fail, nothing is deployed. A failed deploy shows as a red run in the repo's **Actions** tab:
+
+- **The build fails:** the previous version keeps running.
+- **The new version builds but fails to start** (for example, a migration error): the site is down until a fix or a revert is merged to `main`.
+
 ## Changing the database password
 
 PostgreSQL keeps the password it was first created with, even if you later change `DB_PASSWORD`. Change it in the database first, then in the settings file:

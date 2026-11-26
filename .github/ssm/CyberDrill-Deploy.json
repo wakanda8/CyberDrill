@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Deploy CyberDrill: move /opt/cyberdrill to the given main commit, rebuild and restart the containers.",
+  "parameters": {
+    "commit": {
+      "type": "String",
+      "description": "Full 40-character SHA of the main commit to deploy (the commit GitHub Actions tested).",
+      "allowedPattern": "^[0-9a-f]{40}$"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "deploy",
+      "inputs": {
+        "timeoutSeconds": "1800",
+        "runCommand": [
+          "set -eu",
+          "cd /opt/cyberdrill",
+          "git fetch -q origin main",
+          "git merge-base --is-ancestor {{ commit }} origin/main || { echo 'Commit {{ commit }} is not on main. Nothing deployed.'; exit 1; }",
+          "git merge -q --ff-only {{ commit }}",
+          "echo \"code now at: $(git log --oneline -1)\"",
+          "start=$(date +%s)",
+          "docker compose --env-file .env.production up -d --build > /var/log/cyberdrill-deploy.log 2>&1 || { echo 'Build failed. The previous version is still running.'; tail -25 /var/log/cyberdrill-deploy.log; exit 1; }",
+          "for i in $(seq 1 40); do docker compose --env-file .env.production exec -T app curl -s -o /dev/null -w '%{http_code}' http://localhost/up 2>/dev/null | grep -q 200 && break; sleep 3; done",
+          "code=$(docker compose --env-file .env.production exec -T app curl -s -o /dev/null -w '%{http_code}' http://localhost/up 2>/dev/null || true)",
+          "echo \"deployed in $(( $(date +%s) - start ))s, app /up: ${code:-no response}\"",
+          "docker compose --env-file .env.production logs --since 5m app 2>&1 | grep -E 'Nothing to migrate|Running migrations|SQLSTATE|FAIL' | head -5 || true",
+          "docker image prune -f > /dev/null",
+          "test \"$code\" = 200"
+        ]
+      }
+    }
+  ]
+}
