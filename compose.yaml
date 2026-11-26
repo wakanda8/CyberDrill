@@ -1,0 +1,45 @@
+# Self-hosted production: the app, its PostgreSQL database and a Cloudflare Tunnel.
+# The tunnel connects out to Cloudflare, so no port is opened on this machine.
+# Run every command with the production settings file, for example:
+#   docker compose --env-file .env.production up -d --build
+# See DEPLOY.md.
+
+services:
+  app:
+    build: .
+    env_file: .env.production
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      CLOUDFLARE_TUNNEL_TOKEN: "" # only the tunnel container needs the token
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?Set DB_DATABASE in .env.production and pass --env-file .env.production}
+      POSTGRES_USER: ${DB_USERNAME:?Set DB_USERNAME in .env.production}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.production}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in .env.production}
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  db-data:
