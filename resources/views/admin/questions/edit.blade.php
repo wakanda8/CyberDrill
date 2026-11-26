@@ -19,10 +19,10 @@
 <body>
 
     <div class="form-container">
-        <a href="{{ route('questions.index') }}" class="btn-back">← Back to Scenarios</a>
+        <a href="{{ route('admin.questions.index') }}" class="btn-back">← Back to Scenarios</a>
         <h2>Edit {{ ucfirst($module) }} Scenario (ID: {{ $scenario->id }})</h2>
         
-        <form action="{{ route('questions.update', $scenario->id) }}" method="POST">
+        <form action="{{ route('admin.questions.update', $scenario->id) }}" method="POST">
             @csrf
             @method('PUT') <input type="hidden" name="module_type" value="{{ $module }}">
 

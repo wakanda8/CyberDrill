@@ -37,11 +37,11 @@ class AdminAccessTest extends TestCase
             $this->get($page)->assertForbidden();
         }
         $this->get('/admin/questions/create')->assertForbidden();
-        $this->get('/questions')->assertForbidden();
-        $this->post('/questions', ['module_type' => 'spam'])->assertForbidden();
+        $this->post('/admin/questions', ['module_type' => 'spam'])->assertForbidden();
         $this->delete("/admin/attempt/{$attempt->id}")->assertForbidden();
 
         $this->assertDatabaseHas('simulation_attempts', ['id' => $attempt->id]);
+        $this->assertDatabaseCount('questions', 0);
     }
 
     public function test_admins_can_use_admin_pages(): void
@@ -63,7 +63,6 @@ class AdminAccessTest extends TestCase
         $this->actingAs(User::factory()->admin()->create());
 
         $this->get('/admin/questions/1')->assertMethodNotAllowed();
-        $this->get('/questions/1')->assertMethodNotAllowed();
     }
 
     public function test_make_admin_command_promotes_existing_user(): void

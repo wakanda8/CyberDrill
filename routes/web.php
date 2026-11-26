@@ -71,13 +71,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/malware/update', [SimulationController::class, 'updateMalware'])->name('malware.update');
     Route::post('/malware/submit', [SimulationController::class, 'submitMalwareAttempt'])->name('malware.submit');
 
-    // Spam Module (Static for now until logic is added)
-    Route::get('/spam', function () { return view('spam'); })->name('spam');
-    // Inside your auth middleware group
-Route::get('/spam', [\App\Http\Controllers\SimulationController::class, 'showSpam'])->name('spam');
-Route::post('/spam/update', [\App\Http\Controllers\SimulationController::class, 'updateSpam'])->name('spam.update');
-Route::post('/spam/submit', [\App\Http\Controllers\SimulationController::class, 'submitSpam'])->name('spam.submit');
-Route::get('/certificate', [ProfileController::class, 'showCertificate'])->name('certificate');
+    // Spam Module
+    Route::get('/spam', [SimulationController::class, 'showSpam'])->name('spam');
+    Route::post('/spam/update', [SimulationController::class, 'updateSpam'])->name('spam.update');
+    Route::post('/spam/submit', [SimulationController::class, 'submitSpam'])->name('spam.submit');
+
+    Route::get('/certificate', [ProfileController::class, 'showCertificate'])->name('certificate');
 
 });
 
@@ -92,19 +91,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/admin', [AdminController::class, 'index'])->name('admin.dashboard');
     Route::get('/admin/export', [AdminController::class, 'export'])->name('admin.export');
     Route::delete('/admin/attempt/{id}', [AdminController::class, 'deleteAttempt'])->name('admin.deleteAttempt');
-    Route::resource('questions', AdminQuestionController::class)->except('show');
-    
 
-    // Question Management (Phishing)
-    Route::resource('/admin/questions', AdminQuestionController::class, [
-        'names' => [
-            'index'   => 'admin.questions.index',
-            'create'  => 'admin.questions.create',
-            'store'   => 'admin.questions.store',
-            'edit'    => 'admin.questions.edit',
-            'update'  => 'admin.questions.update',
-            'destroy' => 'admin.questions.destroy',
-        ]
-    ])->except('show');
+    // Scenario Management (phishing, malware and spam)
+    Route::resource('admin/questions', AdminQuestionController::class)
+        ->except('show')
+        ->names('admin.questions');
 });
 

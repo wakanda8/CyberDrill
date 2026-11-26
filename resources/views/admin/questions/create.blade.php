@@ -22,7 +22,7 @@
     <div class="form-container">
         <h2>Add New Scenario to Database</h2>
         
-        <form action="{{ route('questions.store') }}" method="POST">
+        <form action="{{ route('admin.questions.store') }}" method="POST">
             @csrf
             
             <div class="form-group">

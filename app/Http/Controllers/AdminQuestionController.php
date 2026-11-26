@@ -2,13 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use App\Models\PhishingScenario; 
+use Illuminate\Validation\Rule;
+use App\Models\PhishingScenario;
 use App\Models\MalwareScenario;
 use App\Models\Question;
 
 class AdminQuestionController extends Controller
 {
+    /**
+     * The scenario types an admin can manage.
+     */
+    private const MODULES = ['phishing', 'malware', 'spam'];
+
     // READ: Show all scenarios on the main dashboard (Fixes the 500 error)
     public function index()
     {
@@ -28,9 +35,11 @@ class AdminQuestionController extends Controller
     }
 
     // STORE: Save data correctly based on the module type
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $module = $request->input('module_type');
+        $module = $request->validate([
+            'module_type' => ['required', Rule::in(self::MODULES)],
+        ])['module_type'];
 
         if ($module === 'phishing') {
             PhishingScenario::create([
@@ -63,7 +72,7 @@ class AdminQuestionController extends Controller
             ]);
             $msg = 'Malware Scenario Created!';
         } 
-        elseif ($module === 'spam') {
+        else {
     $options = [
         ['text' => $request->opt1_text, 'result' => $request->opt1_result, 'feedback' => $request->opt1_feedback],
         ['text' => $request->opt2_text, 'result' => $request->opt2_result, 'feedback' => $request->opt2_feedback]
@@ -83,7 +92,7 @@ class AdminQuestionController extends Controller
     ]);
     $msg = 'Spam Scenario Created!';
 }
-        return redirect()->route('questions.index')->with('success', $msg);
+        return redirect()->route('admin.questions.index')->with('success', $msg);
     }
     
     // --- EDIT: Show the form to edit a scenario ---
@@ -107,9 +116,11 @@ class AdminQuestionController extends Controller
     }
 
     // --- UPDATE: Save the edited changes ---
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id): RedirectResponse
     {
-        $module = $request->input('module_type');
+        $module = $request->validate([
+            'module_type' => ['required', Rule::in(self::MODULES)],
+        ])['module_type'];
 
         if ($module === 'phishing') {
             PhishingScenario::findOrFail($id)->update([
@@ -127,7 +138,7 @@ class AdminQuestionController extends Controller
                 'title' => $request->title, 'filename' => $request->filename, 'filetype' => $request->filetype,
                 'publisher' => $request->publisher, 'description' => $request->description, 'options' => json_encode($options),
             ]);
-        } elseif ($module === 'spam') {
+        } else {
             $options = [
                 ['text' => $request->opt1_text, 'result' => $request->opt1_result, 'feedback' => $request->opt1_feedback],
                 ['text' => $request->opt2_text, 'result' => $request->opt2_result, 'feedback' => $request->opt2_feedback]
@@ -139,18 +150,24 @@ class AdminQuestionController extends Controller
             ]);
         }
 
-        return redirect()->route('questions.index')->with('success', ucfirst($module) . ' Scenario Updated Successfully!');
+        return redirect()->route('admin.questions.index')->with('success', ucfirst($module) . ' Scenario Updated Successfully!');
     }
 
     // --- DESTROY: Delete the scenario ---
-    public function destroy($id, Request $request)
+    public function destroy(string $id, Request $request): RedirectResponse
     {
-        $module = $request->input('module');
+        $module = $request->validate([
+            'module' => ['required', Rule::in(self::MODULES)],
+        ])['module'];
 
-        if ($module === 'phishing') PhishingScenario::findOrFail($id)->delete();
-        elseif ($module === 'malware') MalwareScenario::findOrFail($id)->delete();
-        elseif ($module === 'spam') Question::findOrFail($id)->delete();
+        if ($module === 'phishing') {
+            PhishingScenario::findOrFail($id)->delete();
+        } elseif ($module === 'malware') {
+            MalwareScenario::findOrFail($id)->delete();
+        } else {
+            Question::findOrFail($id)->delete();
+        }
 
-        return redirect()->route('questions.index')->with('success', 'Scenario Deleted Successfully!');
+        return redirect()->route('admin.questions.index')->with('success', 'Scenario Deleted Successfully!');
     }
 }
