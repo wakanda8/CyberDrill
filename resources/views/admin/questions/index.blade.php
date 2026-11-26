@@ -27,7 +27,7 @@
             <a href="{{ route('admin.dashboard') }}" class="btn-back">&larr; Back</a>
             <h1>Manage CyberDrill Scenarios</h1>
         </div>
-        <a href="{{ route('questions.create') }}" class="btn-primary">+ Add New Scenario</a>
+        <a href="{{ route('admin.questions.create') }}" class="btn-primary">+ Add New Scenario</a>
     </div>
 
     @if(session('success'))
@@ -44,8 +44,8 @@
                 <td>{{ $p->sender_email }}</td>
                 <td>{{ $p->is_phishing ? 'Malicious' : 'Safe' }}</td>
                 <td style="display: flex; gap: 10px;">
-                    <a href="{{ route('questions.edit', ['question' => $p->id, 'module' => 'phishing']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
-                    <form action="{{ route('questions.destroy', $p->id) }}" method="POST" style="margin:0;">
+                    <a href="{{ route('admin.questions.edit', ['question' => $p->id, 'module' => 'phishing']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
+                    <form action="{{ route('admin.questions.destroy', $p->id) }}" method="POST" style="margin:0;">
                         @csrf @method('DELETE')
                         <input type="hidden" name="module" value="phishing">
                         <button type="submit" onclick="return confirm('Delete Phishing Scenario?');" style="background:none; border:none; color:#ef4444; cursor:pointer;">Delete</button>
@@ -67,8 +67,8 @@
                 <td>{{ $m->filename }}</td>
                 <td>{{ $m->publisher }}</td>
                 <td style="display: flex; gap: 10px;">
-                    <a href="{{ route('questions.edit', ['question' => $m->id, 'module' => 'malware']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
-                    <form action="{{ route('questions.destroy', $m->id) }}" method="POST" style="margin:0;">
+                    <a href="{{ route('admin.questions.edit', ['question' => $m->id, 'module' => 'malware']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
+                    <form action="{{ route('admin.questions.destroy', $m->id) }}" method="POST" style="margin:0;">
                         @csrf @method('DELETE')
                         <input type="hidden" name="module" value="malware">
                         <button type="submit" onclick="return confirm('Delete Malware Scenario?');" style="background:none; border:none; color:#ef4444; cursor:pointer;">Delete</button>
@@ -90,8 +90,8 @@
                 <td>{{ $s->sender_name }}</td>
                 <td>{{ $s->type }}</td>
                 <td style="display: flex; gap: 10px;">
-                    <a href="{{ route('questions.edit', ['question' => $s->id, 'module' => 'spam']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
-                    <form action="{{ route('questions.destroy', $s->id) }}" method="POST" style="margin:0;">
+                    <a href="{{ route('admin.questions.edit', ['question' => $s->id, 'module' => 'spam']) }}" style="color:var(--primary); text-decoration:none;">Edit</a>
+                    <form action="{{ route('admin.questions.destroy', $s->id) }}" method="POST" style="margin:0;">
                         @csrf @method('DELETE')
                         <input type="hidden" name="module" value="spam">
                         <button type="submit" onclick="return confirm('Delete Spam Scenario?');" style="background:none; border:none; color:#ef4444; cursor:pointer;">Delete</button>
